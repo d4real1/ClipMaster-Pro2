@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ClipMaster Pro - Advanced Browser Video Editor</title>
+    <meta name="description" content="Edit videos in your browser for free. No watermarks, AI tools, and 100% private.">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.4/dist/ffmpeg.min.js"></script>
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+        :root {
+            --primary: #7e57ff;
+            --primary-dark: #6a43f0;
+            --secondary: #00e0b0;
+            --accent: #ff6b9d;
+            --dark: #0c111f;
+            --darker: #080b16;
+            --light: #f0f5ff;
+            --gray: #8a9bba;
+            --success: #00e0b0;
+            --warning: #ffaa4d;
+            --error: #ff6b7d;
+            --card-bg: rgba(25, 35, 55, 0.95);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --transition: all 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+        
+        body {
+            background: radial-gradient(ellipse at top left, #0a0f1f, #050812);
+            color: var(--light);
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.6;
+            overflow-x: hidden;
+            position: relative;
+            background-attachment: fixed;
+        }
+        
+        /* [All previous CSS styles remain exactly the same] */
+        
+        /* Add this new CSS for the affiliate dashboard */
+        .affiliate-dashboard {
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 20px;
+            margin: 20px auto;
+            max-width: 800px;
+            border: 1px solid var(--card-border);
+        }
+        .affiliate-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 20px 0;
+        }
+        .affiliate-stat {
+            background: rgba(126, 87, 255, 0.1);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid var(--card-border);
+        }
+        .affiliate-link-box {
+            background: rgba(0, 224, 176, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            word-break: break-all;
+            margin: 20px 0;
+            border: 1px solid var(--card-border);
+        }
+    </style>
+</head>
+<body>
+    <div class="particles" id="particles"></div>
+    
+    <div class="container">
+        <header>
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-cut"></i>
+                </div>
+                <h1>ClipMaster Pro</h1>
+            </div>
+            <p class="subtitle">The ultimate browser-based video editor with AI-powered tools and no watermarks</p>
+            <div class="badge-container">
+                <div class="badge"><i class="fas fa-shield-alt"></i> Complete Privacy</div>
+                <div class="badge"><i class="fas fa-ban"></i> Zero Watermarks</div>
+                <div class="badge"><i class="fas fa-bolt"></i> AI-Powered Tools</div>
+                <div class="badge"><i class="fas fa-infinity"></i> 100% Free Forever</div>
+            </div>
+        </header>
+        
+        <!-- Usage Meter -->
+        <div class="usage-meter">
+            <div class="usage-header">
+                <span>Your Free Clips</span>
+                <span id="clipsUsed">0</span>/25
+            </div>
+            <div class="usage-progress">
+                <div class="usage-progress-fill" id="usageProgress"></div>
+            </div>
+            <div class="usage-text" id="usageText">You've used 0 of your 25 free clips</div>
+        </div>
+        
+        <!-- [All previous HTML remains the same until footer] -->
+        
+        <!-- Affiliate Dashboard -->
+        <div id="affiliateDashboard" class="affiliate-dashboard" style="display: none;">
+            <h2><i class="fas fa-hand-holding-usd"></i> Your Affiliate Dashboard</h2>
+            <p>Earn 20% commission when friends use your link!</p>
+            
+            <div class="affiliate-stats">
+                <div class="affiliate-stat">
+                    <h3>Total Referrals</h3>
+                    <p id="totalReferrals">0</p>
+                </div>
+                <div class="affiliate-stat">
+                    <h3>Your Earnings</h3>
+                    <p id="totalEarnings">£0.00</p>
+                </div>
+            </div>
+            
+            <div class="affiliate-link-box">
+                <h3><i class="fas fa-link"></i> Your Special Link</h3>
+                <input type="text" id="referralLink" value="Loading..." readonly>
+                <button class="btn" onclick="copyReferralLink()" style="margin-top: 10px;">
+                    <i class="fas fa-copy"></i> Copy Link
+                </button>
+            </div>
+        </div>
+
+        <footer>
+            <p><span class="pulse"></span> All processing happens locally in your browser</p>
+            <p>© 2023 ClipMaster Pro | <a href="#" id="affiliateToggle"><i class="fas fa-link"></i> Affiliate Program</a> | No Tracking</p>
+        </footer>
+    </div>
+
+    <!-- Payment Modal -->
+    <div class="modal-overlay" id="paymentModal" style="display: none;">
+        <div class="modal-content">
+            <div class="close-modal" id="closeModal">&times;</div>
+            <h2 class="modal-title">Upgrade to Continue</h2>
+            <p class="modal-text">You've used all 25 free clips. To keep editing:</p>
+            
+            <div class="pricing-option" id="payPerUseOption">
+                <div class="pricing-header">
+                    <div class="pricing-title">Pay As You Go</div>
+                    <div class="pricing-price">£0.05/clip</div>
+                </div>
+                <div class="pricing-desc">Only pay for what you use</div>
+            </div>
+            
+            <div class="pricing-option" id="bulkOption">
+                <div class="pricing-header">
+                    <div class="pricing-title">Bulk Package</div>
+                    <div class="pricing-price">£1.00</div>
+                </div>
+                <div class="pricing-desc">25 clips (save 25%)</div>
+            </div>
+            
+            <div class="pricing-option" id="unlimitedOption">
+                <div class="pricing-header">
+                    <div class="pricing-title">Unlimited</div>
+                    <div class="pricing-price">£2.99/month</div>
+                </div>
+                <div class="pricing-desc">Edit as much as you want</div>
+            </div>
+            
+            <button id="proceedToPayment" class="btn btn-large" style="width: 100%; margin-top: 20px;">
+                <i class="fas fa-credit-card"></i> Continue
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Initialize FFmpeg
+        const { createFFmpeg, fetchFile } = FFmpeg;
+        const ffmpeg = createFFmpeg({ 
+            log: true,
+            corePath: 'https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js'
+        });
+        
+        // Initialize Stripe (test mode)
+        const stripe = Stripe('pk_test_51NcZ3XKZ2Z7Z3Q3Z3Q3Z3Q3Z3Q3Z3Q3Z3Q3Z3Q3Z3Q3Z3Q3Z3Q3Z3Q3Z3Q3Z3Q3Z3Q3Z3Q3Z3Q3Z3Q3Z3Q3');
+        
+        let isFFmpegLoaded = false;
+        let currentVideo = {
+            file: null,
+            name: "",
+            duration: 0,
+            startTime: 0,
+            endTime: 0,
+            brightness: 100,
+            contrast: 100,
+            volume: 100
+        };
+        
+        // Track user's clip usage
+        let clipUsage = {
+            freeClipsUsed: 0,
+            paidClipsUsed: 0,
+            totalSpent: 0,
+            referrals: 0,
+            earnings: 0
+        };
+        
+        // Load usage data from localStorage
+        function loadUsageData() {
+            const savedUsage = localStorage.getItem('clipmaster_usage');
+            if (savedUsage) {
+                clipUsage = JSON.parse(savedUsage);
+            }
+            updateUsageDisplay();
+            updateAffiliateDashboard();
+        }
+        
+        // Save usage data to localStorage
+        function saveUsageData() {
+            localStorage.setItem('clipmaster_usage', JSON.stringify(clipUsage));
+            updateUsageDisplay();
+            updateAffiliateDashboard();
+        }
+        
+        // Update the usage display
+        function updateUsageDisplay() {
+            const freeClipsLeft = Math.max(0, 25 - clipUsage.freeClipsUsed);
+            const usedPercentage = (clipUsage.freeClipsUsed / 25) * 100;
+            
+            document.getElementById('clipsUsed').textContent = clipUsage.freeClipsUsed;
+            document.getElementById('usageProgress').style.width = `${usedPercentage}%`;
+            
+            if (freeClipsLeft > 0) {
+                document.getElementById('usageText').textContent = 
+                    `You've used ${clipUsage.freeClipsUsed} of your 25 free clips (${freeClipsLeft} remaining)`;
+            } else {
+                document.getElementById('usageText').textContent = 
+                    `You've used all 25 free clips. Additional clips cost £0.05 each.`;
+            }
+        }
+        
+        // Update affiliate dashboard
+        function updateAffiliateDashboard() {
+            document.getElementById('totalReferrals').textContent = clipUsage.referrals;
+            document.getElementById('totalEarnings').textContent = `£${clipUsage.earnings.toFixed(2)}`;
+        }
+        
+        // Generate referral link
+        function generateReferralLink() {
+            const userId = localStorage.getItem('user_id') || 'user' + Math.floor(Math.random() * 10000);
+            return window.location.origin + window.location.pathname + '?ref=' + userId;
+        }
+        
+        // Copy referral link
+        function copyReferralLink() {
+            const linkInput = document.getElementById('referralLink');
+            linkInput.select();
+            document.execCommand('copy');
+            alert('Copied to clipboard!');
+        }
+        
+        // Show payment modal
+        function showPaymentModal() {
+            document.getElementById('paymentModal').style.display = 'flex';
+        }
+        
+        // Hide payment modal
+        function hidePaymentModal() {
+            document.getElementById('paymentModal').style.display = 'none';
+        }
+        
+        // Initialize payment options
+        function initPaymentOptions() {
+            document.querySelectorAll('.pricing-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    document.querySelectorAll('.pricing-option').forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+                    this.classList.add('selected');
+                });
+            });
+            
+            document.getElementById('closeModal').addEventListener('click', hidePaymentModal);
+            
+            document.getElementById('proceedToPayment').addEventListener('click', async function() {
+                const selectedOption = document.querySelector('.pricing-option.selected');
+                if (!selectedOption) {
+                    alert('Please select a payment option');
+                    return;
+                }
+                
+                showStatus("Processing payment...", "processing");
+                hidePaymentModal();
+                
+                // Simulate payment processing
+                setTimeout(() => {
+                    if (selectedOption.id === 'payPerUseOption') {
+                        clipUsage.totalSpent += 1.00;
+                        clipUsage.paidClipsUsed += 20; // 20 clips for £1
+                    } else if (selectedOption.id === 'bulkOption') {
+                        clipUsage.totalSpent += 1.00;
+                        clipUsage.paidClipsUsed += 25;
+                    } else if (selectedOption.id === 'unlimitedOption') {
+                        clipUsage.totalSpent += 2.99;
+                        localStorage.setItem('clipmaster_unlimited', new Date().getTime() + (30 * 24 * 60 * 60 * 1000));
+                    }
+                    
+                    saveUsageData();
+                    showStatus("Payment successful! You can now export your clip.", "success");
+                }, 2000);
+            });
+        }
+        
+        // Initialize affiliate tracking
+        function initAffiliateTracking() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const affiliateId = urlParams.get('ref');
+            
+            if (affiliateId) {
+                // In a real app, you would send this to your server
+                console.log(`Referred by: ${affiliateId}`);
+                localStorage.setItem('affiliate', affiliateId);
+                
+                // Track the referral (simplified)
+                if (!localStorage.getItem('referred_' + affiliateId)) {
+                    localStorage.setItem('referred_' + affiliateId, 'true');
+                    // Normally you'd update the affiliate's stats here
+                }
+            }
+            
+            // Set up affiliate dashboard toggle
+            document.getElementById('affiliateToggle').addEventListener('click', function(e) {
+                e.preventDefault();
+                const dashboard = document.getElementById('affiliateDashboard');
+                dashboard.style.display = dashboard.style.display === 'none' ? 'block' : 'none';
+                
+                // Generate referral link if not already set
+                if (dashboard.style.display === 'block') {
+                    document.getElementById('referralLink').value = generateReferralLink();
+                }
+            });
+        }
+        
+        // [Rest of your existing JavaScript functions remain the same]
+        
+        // Initialize everything when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            createParticles();
+            loadUsageData();
+            initPaymentOptions();
+            initAffiliateTracking();
+            
+            // [Rest of your existing initialization code]
+        });
+    </script>
+</body>
+</html>
